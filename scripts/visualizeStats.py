@@ -9,7 +9,7 @@ from dateutil.parser import parse
 import numpy as np
 import os
 import argparse
-import statistics
+import datetime
 
 latency_collection_tag = "<latency_collection>"
 inview_tag = "<inView>"
@@ -364,6 +364,7 @@ def main():
     }
 
     for idx, k in enumerate(node_infos):
+        nr_entries = len(node_infos[k]["timestamp_dt"])
         pd_data["degree"] += node_infos[k]["degree"]
         pd_data["peers"] += node_infos[k]["peers"]
         pd_data["ip"] += node_infos[k]["ip"]
@@ -375,10 +376,8 @@ def main():
         pd_data["app_msgs_sent"] += node_infos[k]["app_msgs_sent"]
         pd_data["app_msgs_rcvd"] += node_infos[k]["app_msgs_rcvd"]
 
-        pd_data["latency_avg_global"] += [system_lat_avg] * \
-            len(node_infos[k]["timestamp_dt"])
-        pd_data["coordinates"] += [coords[k]] * \
-            len(node_infos[k]["timestamp_dt"])
+        pd_data["latency_avg_global"] += [system_lat_avg] * nr_entries
+        pd_data["coordinates"] += [coords[k]] * nr_entries
 
     df = pd.DataFrame(pd_data)
     df.index = df["timestamp"]
@@ -399,6 +398,14 @@ def main():
     #               output_path=args.output_path)
     # plotConfigMapAndConnections(node_positions, node_ids, parent_edges,
     #                             landmarks, latencies, args.output_path)
+    df.to_csv(f"{args.output_path}stats.csv")
+    with open(f'{args.output_path}node_infos.json', 'w') as outfile:
+        json.dump(node_infos.copy(), outfile, default=myconverter)
+
+
+def myconverter(o):
+    if isinstance(o, datetime.datetime):
+        return o.__str__()
 
 
 if __name__ == "__main__":

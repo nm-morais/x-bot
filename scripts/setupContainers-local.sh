@@ -22,11 +22,6 @@ if [ -z $LATENCY_MAP ]; then
   exit
 fi
 
-if [ -z $SWARM_VOL ]; then
-  echo "Pls specify env var SWARM_VOL"
-  exit
-fi
-
 
 echo "SWARM_NET: $SWARM_NET"
 echo "DOCKER_IMAGE: $DOCKER_IMAGE"
@@ -37,7 +32,7 @@ currdir=$(pwd)
 docker ps -a | awk '{ print $1,$2 }' | grep $DOCKER_IMAGE | awk '{print $1 }' | xargs -I {} docker rm -f {}
 docker swarm init || true
 docker network create -d overlay --attachable --subnet $SWARM_SUBNET $SWARM_NET || true
-mkdir $SWARM_VOL || true
+mkdir $SWARM_VOL_DIR || true
 
 bootstrap_peer_full_line=$(head -n 1 $IPS_FILE)
 bootstrap_peer=$(echo "$bootstrap_peer_full_line" | cut -d' ' -f 1)
@@ -53,7 +48,7 @@ i=0
 while read -r ip name
 do
   echo "Starting container with ip $ip and name: $name"
-  docker run -e config='/config/exampleConfig.yml' --cap-add=NET_ADMIN --net $SWARM_NET -v $SWARM_VOL:/tmp/logs -d -t --name "node$i" --ip $ip $DOCKER_IMAGE $i $nContainers -bootstraps="$bootstrap_peer" -listenIP="$ip"
+  docker run -e config='/config/exampleConfig.yml' --cap-add=NET_ADMIN --net $SWARM_NET -v $SWARM_VOL_DIR:/tmp/logs -d -t --name "node$i" --ip $ip $DOCKER_IMAGE $i $nContainers -bootstraps="$bootstrap_peer" -listenIP="$ip"
   i=$((i+1))
 done < "$IPS_FILE"
 
