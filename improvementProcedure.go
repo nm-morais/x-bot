@@ -35,7 +35,7 @@ func (xb *XBot) handlePeerMeasuredNotification(n notification.Notification) {
 	peerMeasuredNInfo, err := xb.nodeWatcher.GetNodeInfo(peerMeasured)
 	defer xb.nodeWatcher.Unwatch(peerMeasured, xb.ID())
 	if err != nil {
-		xb.logger.Errorf("peer was %s not being measured", peerMeasured.String())
+		xb.logger.Warnf("peer was %s not being measured", peerMeasured.String())
 		return
 	}
 	xb.logger.Infof("Peer measured: %s:%+v", peerMeasured.String(), peerMeasuredNInfo.LatencyCalc().CurrValue())
@@ -59,7 +59,7 @@ func (xb *XBot) handlePeerMeasuredNotification(n notification.Notification) {
 			toCompareWith := xb.activeView.asArr[xb.conf.UN:]
 			sort.Sort(toCompareWith)
 			for _, curr := range toCompareWith {
-				if xb.isBetter(curr.measuredScore, measuredScore) {
+				if xb.isBetter(measuredScore, curr.measuredScore) {
 					// latency to curr is better
 					xb.logger.Infof("Measured peer %s:%+v is better than peer %s:%+v!",
 						peerMeasured.String(), measuredScore, curr.String(), curr.measuredScore)
@@ -81,16 +81,19 @@ func (xb *XBot) handlePeerMeasuredNotification(n notification.Notification) {
 	if ok {
 		delete(xb.pendingReplacements, peerMeasured.String())
 		xb.logger.Infof("Measured peer %s is a pending replacement ", peerMeasured.String())
-		sender, ok := xb.activeView.get(replacement.candidate)
-		if !ok || !xb.isBetter(measuredScore, sender.measuredScore) {
-			if !ok {
-				xb.logger.Errorf("candidate peer is not in active view anymore")
-			}
+		candidate, ok := xb.activeView.get(replacement.candidate)
+		if !ok {
+			xb.logger.Warnf("candidate peer is not in active view anymore, refusing ReplaceMessage")
+			xb.sendMessageTmpTransport(ReplaceMessageReply{
+				answer:    false,
+				initiator: replacement.initiator,
+				o:         replacement.original,
+			}, replacement.candidate)
+			return
+		}
 
-			if ok && !xb.isBetter(measuredScore, sender.measuredScore) {
-				xb.logger.Errorf("candidate peer is not better")
-			}
-
+		if !xb.isBetter(measuredScore, candidate.measuredScore) {
+			xb.logger.Warnf("candidate peer is not better, refusing ReplaceMessage")
 			xb.sendMessage(ReplaceMessageReply{
 				answer:    false,
 				initiator: replacement.initiator,
@@ -100,7 +103,7 @@ func (xb *XBot) handlePeerMeasuredNotification(n notification.Notification) {
 		}
 
 		// is better!
-		xb.sendMessage(SwitchMessage{
+		xb.sendMessageTmpTransport(SwitchMessage{
 			i: replacement.initiator,
 			c: replacement.candidate,
 		}, peerMeasured)
