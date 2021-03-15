@@ -201,6 +201,7 @@ func (xb *XBot) DialFailed(p peer.Peer) {
 
 func (xb *XBot) handleNodeDown(p peer.Peer) {
 	defer xb.logXBotState()
+	defer xb.nodeWatcher.Unwatch(p, xb.ID())
 	if xb.activeView.remove(p) {
 		if !xb.activeView.isFull() {
 			if xb.passiveView.size() == 0 {
