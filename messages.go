@@ -231,30 +231,30 @@ func (ShuffleReplyMessageSerializer) Deserialize(msgBytes []byte) message.Messag
 const OptimizationMessageType = 2008
 
 type OptimizationMessage struct {
-	o peer.Peer
+	O peer.Peer
 }
 type OptimizationMessageSerializer struct{}
 
 var defaultOptimizationMessageSerializer = OptimizationMessageSerializer{}
 
-func (OptimizationMessage) Type() message.ID { return OptimizationMessageType }
-func (OptimizationMessage) Serializer() message.Serializer {
+func (*OptimizationMessage) Type() message.ID { return OptimizationMessageType }
+func (*OptimizationMessage) Serializer() message.Serializer {
 	return defaultOptimizationMessageSerializer
 }
-func (OptimizationMessage) Deserializer() message.Deserializer {
+func (*OptimizationMessage) Deserializer() message.Deserializer {
 	return defaultOptimizationMessageSerializer
 }
 func (OptimizationMessageSerializer) Serialize(msg message.Message) []byte {
-	optMsg := msg.(OptimizationMessage)
-	msgBytes := optMsg.o.Marshal()
+	optMsg := msg.(*OptimizationMessage)
+	msgBytes := optMsg.O.Marshal()
 	return msgBytes
 }
 
 func (OptimizationMessageSerializer) Deserialize(msgBytes []byte) message.Message {
-	old := peer.IPeer{}
+	old := &peer.IPeer{}
 	old.Unmarshal(msgBytes)
-	return OptimizationMessage{
-		o: &old,
+	return &OptimizationMessage{
+		O: old,
 	}
 }
 
@@ -263,40 +263,39 @@ const OptimizationMessageReplyType = 2009
 type OptimizationMessageReply struct {
 	accepted     bool
 	hasOtherNode bool
-	o            peer.Peer
-	d            peer.Peer
+	O            peer.Peer
+	D            peer.Peer
 }
 type OptimizationMessageReplySerializer struct{}
 
 var defaultOptimizationMessageReplySerializer = OptimizationMessageReplySerializer{}
 
-func (OptimizationMessageReply) Type() message.ID { return OptimizationMessageReplyType }
-func (OptimizationMessageReply) Serializer() message.Serializer {
+func (*OptimizationMessageReply) Type() message.ID { return OptimizationMessageReplyType }
+func (*OptimizationMessageReply) Serializer() message.Serializer {
 	return defaultOptimizationMessageReplySerializer
 }
-func (OptimizationMessageReply) Deserializer() message.Deserializer {
+func (*OptimizationMessageReply) Deserializer() message.Deserializer {
 	return defaultOptimizationMessageReplySerializer
 }
 func (OptimizationMessageReplySerializer) Serialize(msg message.Message) []byte {
-	optReplyMsg := msg.(OptimizationMessageReply)
+	optReplyMsg := msg.(*OptimizationMessageReply)
 	msgBytes := make([]byte, 1)
 	if optReplyMsg.accepted {
 		msgBytes[0] = 1
 	}
-	msgBytes = append(msgBytes, optReplyMsg.o.Marshal()...)
 	if optReplyMsg.hasOtherNode {
 		msgBytes = append(msgBytes, 1)
-		msgBytes = append(msgBytes, optReplyMsg.d.Marshal()...)
+		msgBytes = append(msgBytes, optReplyMsg.D.Marshal()...)
 	} else {
 		msgBytes = append(msgBytes, 0)
 	}
-
+	msgBytes = append(msgBytes, optReplyMsg.O.Marshal()...)
 	return msgBytes
 }
 
 func (OptimizationMessageReplySerializer) Deserialize(msgBytes []byte) message.Message {
 	d := &peer.IPeer{}
-	otherNode := &peer.IPeer{}
+	var otherNode peer.Peer = nil
 	hasOtherNode := false
 	accepted := false
 	curr := 0
@@ -304,43 +303,45 @@ func (OptimizationMessageReplySerializer) Deserialize(msgBytes []byte) message.M
 		accepted = true
 	}
 	curr++
-	curr += d.Unmarshal(msgBytes[curr:])
 	if msgBytes[curr] == 1 {
 		hasOtherNode = true
 		curr++
-		d.Unmarshal(msgBytes[curr:])
+		otherNode = &peer.IPeer{}
+		curr += otherNode.Unmarshal(msgBytes[curr:])
+	} else {
+		curr++
 	}
-
-	return OptimizationMessageReply{
+	d.Unmarshal(msgBytes[curr:])
+	return &OptimizationMessageReply{
 		accepted:     accepted,
 		hasOtherNode: hasOtherNode,
-		o:            otherNode,
-		d:            d,
+		O:            otherNode,
+		D:            d,
 	}
 }
 
 const ReplaceMessageType = 2010
 
 type ReplaceMessage struct {
-	initiator peer.Peer
-	o         peer.Peer // this is O in the scheme
+	Initiator peer.Peer
+	O         peer.Peer // this is O in the scheme
 }
 type ReplaceMessageSerializer struct{}
 
 var defaultReplaceMessageSerializer = ReplaceMessageSerializer{}
 
-func (ReplaceMessage) Type() message.ID { return ReplaceMessageType }
-func (ReplaceMessage) Serializer() message.Serializer {
+func (*ReplaceMessage) Type() message.ID { return ReplaceMessageType }
+func (*ReplaceMessage) Serializer() message.Serializer {
 	return defaultReplaceMessageSerializer
 }
-func (ReplaceMessage) Deserializer() message.Deserializer {
+func (*ReplaceMessage) Deserializer() message.Deserializer {
 	return defaultReplaceMessageSerializer
 }
 func (ReplaceMessageSerializer) Serialize(msg message.Message) []byte {
 	msgBytes := []byte{}
-	optReplyMsg := msg.(ReplaceMessage)
-	msgBytes = append(msgBytes, optReplyMsg.o.Marshal()...)
-	msgBytes = append(msgBytes, optReplyMsg.initiator.Marshal()...)
+	optReplyMsg := msg.(*ReplaceMessage)
+	msgBytes = append(msgBytes, optReplyMsg.O.Marshal()...)
+	msgBytes = append(msgBytes, optReplyMsg.Initiator.Marshal()...)
 	return msgBytes
 }
 
@@ -349,9 +350,9 @@ func (ReplaceMessageSerializer) Deserialize(msgBytes []byte) message.Message {
 	initiator := &peer.IPeer{}
 	n := replacement.Unmarshal(msgBytes)
 	initiator.Unmarshal(msgBytes[n:])
-	return ReplaceMessage{
-		o:         replacement,
-		initiator: initiator,
+	return &ReplaceMessage{
+		O:         replacement,
+		Initiator: initiator,
 	}
 }
 
@@ -359,31 +360,31 @@ const ReplaceMessageReplyType = 2011
 
 type ReplaceMessageReply struct {
 	answer    bool
-	initiator peer.Peer
-	o         peer.Peer
+	Initiator peer.Peer
+	O         peer.Peer
 }
 
 type ReplaceMessageReplySerializer struct{}
 
 var defaultReplaceMessageReplySerializer = ReplaceMessageReplySerializer{}
 
-func (ReplaceMessageReply) Type() message.ID { return ReplaceMessageReplyType }
-func (ReplaceMessageReply) Serializer() message.Serializer {
+func (*ReplaceMessageReply) Type() message.ID { return ReplaceMessageReplyType }
+func (*ReplaceMessageReply) Serializer() message.Serializer {
 	return defaultReplaceMessageReplySerializer
 }
-func (ReplaceMessageReply) Deserializer() message.Deserializer {
+func (*ReplaceMessageReply) Deserializer() message.Deserializer {
 	return defaultReplaceMessageReplySerializer
 }
 func (ReplaceMessageReplySerializer) Serialize(msg message.Message) []byte {
 	msgBytes := []byte{}
-	optReplyMsg := msg.(ReplaceMessageReply)
+	optReplyMsg := msg.(*ReplaceMessageReply)
 	if optReplyMsg.answer {
 		msgBytes = append(msgBytes, 1)
 	} else {
 		msgBytes = append(msgBytes, 0)
 	}
-	msgBytes = append(msgBytes, optReplyMsg.initiator.Marshal()...)
-	msgBytes = append(msgBytes, optReplyMsg.o.Marshal()...)
+	msgBytes = append(msgBytes, optReplyMsg.Initiator.Marshal()...)
+	msgBytes = append(msgBytes, optReplyMsg.O.Marshal()...)
 	return msgBytes
 }
 
@@ -395,35 +396,35 @@ func (ReplaceMessageReplySerializer) Deserialize(msgBytes []byte) message.Messag
 	curr++
 	curr += initiator.Unmarshal(msgBytes[curr:])
 	o.Unmarshal(msgBytes[curr:])
-	return ReplaceMessageReply{
+	return &ReplaceMessageReply{
 		answer:    answer,
-		initiator: initiator,
-		o:         o,
+		Initiator: initiator,
+		O:         o,
 	}
 }
 
 const SwitchMessageType = 2012
 
 type SwitchMessage struct {
-	i peer.Peer
-	c peer.Peer
+	I peer.Peer
+	C peer.Peer
 }
 type SwitchMessageSerializer struct{}
 
 var defaultSwitchMessageSerializer = SwitchMessageSerializer{}
 
-func (SwitchMessage) Type() message.ID { return SwitchMessageType }
-func (SwitchMessage) Serializer() message.Serializer {
+func (*SwitchMessage) Type() message.ID { return SwitchMessageType }
+func (*SwitchMessage) Serializer() message.Serializer {
 	return defaultSwitchMessageSerializer
 }
-func (SwitchMessage) Deserializer() message.Deserializer {
+func (*SwitchMessage) Deserializer() message.Deserializer {
 	return defaultSwitchMessageSerializer
 }
 func (SwitchMessageSerializer) Serialize(msg message.Message) []byte {
 	msgBytes := []byte{}
-	optReplyMsg := msg.(SwitchMessage)
-	msgBytes = append(msgBytes, optReplyMsg.c.Marshal()...)
-	msgBytes = append(msgBytes, optReplyMsg.i.Marshal()...)
+	optReplyMsg := msg.(*SwitchMessage)
+	msgBytes = append(msgBytes, optReplyMsg.C.Marshal()...)
+	msgBytes = append(msgBytes, optReplyMsg.I.Marshal()...)
 	return msgBytes
 }
 
@@ -435,9 +436,9 @@ func (SwitchMessageSerializer) Deserialize(msgBytes []byte) message.Message {
 	curr += candidate.Unmarshal(msgBytes)
 	initiator.Unmarshal(msgBytes[curr:])
 
-	return SwitchMessage{
-		i: initiator,
-		c: candidate,
+	return &SwitchMessage{
+		I: initiator,
+		C: candidate,
 	}
 }
 
@@ -445,30 +446,30 @@ const SwitchMessageReplyType = 2013
 
 type SwitchMessageReply struct {
 	answer    bool
-	initiator peer.Peer
-	candidate peer.Peer
+	Initiator peer.Peer
+	Candidate peer.Peer
 }
 type SwitchMessageReplySerializer struct{}
 
 var defaultSwitchMessageReplySerializer = SwitchMessageReplySerializer{}
 
-func (SwitchMessageReply) Type() message.ID { return SwitchMessageReplyType }
-func (SwitchMessageReply) Serializer() message.Serializer {
+func (*SwitchMessageReply) Type() message.ID { return SwitchMessageReplyType }
+func (*SwitchMessageReply) Serializer() message.Serializer {
 	return defaultSwitchMessageReplySerializer
 }
-func (SwitchMessageReply) Deserializer() message.Deserializer {
+func (*SwitchMessageReply) Deserializer() message.Deserializer {
 	return defaultSwitchMessageReplySerializer
 }
 func (SwitchMessageReplySerializer) Serialize(msg message.Message) []byte {
 	msgBytes := []byte{}
-	optReplyMsg := msg.(SwitchMessageReply)
+	optReplyMsg := msg.(*SwitchMessageReply)
 	if optReplyMsg.answer {
 		msgBytes = append(msgBytes, 1)
 	} else {
 		msgBytes = append(msgBytes, 0)
 	}
-	msgBytes = append(msgBytes, optReplyMsg.initiator.Marshal()...)
-	msgBytes = append(msgBytes, optReplyMsg.candidate.Marshal()...)
+	msgBytes = append(msgBytes, optReplyMsg.Initiator.Marshal()...)
+	msgBytes = append(msgBytes, optReplyMsg.Candidate.Marshal()...)
 	return msgBytes
 }
 
@@ -481,26 +482,25 @@ func (SwitchMessageReplySerializer) Deserialize(msgBytes []byte) message.Message
 	n := initiator.Unmarshal(msgBytes[curr:])
 	curr += n
 	candidate.Unmarshal(msgBytes[curr:])
-	return SwitchMessageReply{
+	return &SwitchMessageReply{
 		answer:    answer,
-		initiator: initiator,
-		candidate: candidate,
+		Initiator: initiator,
+		Candidate: candidate,
 	}
 }
 
 const DisconnectWaitType = 2014
 
-type DisconnectWaitMessage struct {
-}
+type DisconnectWaitMessage struct{}
 type DisconnectWaitSerializer struct{}
 
 var defaultDisconnectWaitSerializer = DisconnectWaitSerializer{}
 
-func (DisconnectWaitMessage) Type() message.ID { return DisconnectWaitType }
-func (DisconnectWaitMessage) Serializer() message.Serializer {
+func (*DisconnectWaitMessage) Type() message.ID { return DisconnectWaitType }
+func (*DisconnectWaitMessage) Serializer() message.Serializer {
 	return defaultDisconnectWaitSerializer
 }
-func (DisconnectWaitMessage) Deserializer() message.Deserializer {
+func (*DisconnectWaitMessage) Deserializer() message.Deserializer {
 	return defaultDisconnectWaitSerializer
 }
 func (DisconnectWaitSerializer) Serialize(msg message.Message) []byte {
@@ -508,5 +508,5 @@ func (DisconnectWaitSerializer) Serialize(msg message.Message) []byte {
 }
 
 func (DisconnectWaitSerializer) Deserialize(msgBytes []byte) message.Message {
-	return DisconnectWaitMessage{}
+	return &DisconnectWaitMessage{}
 }

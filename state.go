@@ -6,6 +6,7 @@ import (
 	"math/rand"
 
 	"github.com/nm-morais/go-babel/pkg/peer"
+	"github.com/sirupsen/logrus"
 )
 
 type PeerStateArr []*PeerState
@@ -24,6 +25,7 @@ type View struct {
 	capacity int
 	asArr    PeerStateArr
 	asMap    map[string]*PeerState
+	logger   *logrus.Logger
 }
 
 func (v *View) size() int {
@@ -44,6 +46,8 @@ func (v *View) dropRandom() *PeerState {
 }
 
 func (v *View) add(p *PeerState, dropIfFull bool) {
+	v.logger.Infof("Adding peer %+v to view", p)
+
 	if v.isFull() {
 		if dropIfFull {
 			v.dropRandom()
@@ -56,10 +60,14 @@ func (v *View) add(p *PeerState, dropIfFull bool) {
 	if !alreadyExists {
 		v.asMap[p.String()] = p
 		v.asArr = append([]*PeerState{p}, v.asArr...)
+	} else {
+		v.logger.Infof("Peer %+v already existed in view", p)
 	}
 }
 
 func (v *View) remove(p peer.Peer) (existed bool) {
+	v.logger.Infof("Removing peer %+v from view", p)
+
 	_, existed = v.asMap[p.String()]
 	if existed {
 		found := false
@@ -74,6 +82,8 @@ func (v *View) remove(p peer.Peer) (existed bool) {
 			panic("node was in keys but not in array")
 		}
 		delete(v.asMap, p.String())
+	} else {
+		v.logger.Infof("Peer %+v did not exist in view", p)
 	}
 	return existed
 }

@@ -99,8 +99,18 @@ func NewXBotProtocol(babel protocolManager.ProtocolManager, nw nodeWatcher.NodeW
 			pendingOptimizations:          map[string]bool{},
 			pendingReplacements:           map[string]pendingReplacement{},
 
-			activeView:  &View{capacity: conf.ActiveViewSize, asArr: []*PeerState{}, asMap: map[string]*PeerState{}},
-			passiveView: &View{capacity: conf.PassiveViewSize, asArr: []*PeerState{}, asMap: map[string]*PeerState{}},
+			activeView: &View{
+				capacity: conf.ActiveViewSize,
+				asArr:    []*PeerState{},
+				asMap:    map[string]*PeerState{},
+				logger:   logger,
+			},
+			passiveView: &View{
+				capacity: conf.PassiveViewSize,
+				asArr:    []*PeerState{},
+				asMap:    map[string]*PeerState{},
+				logger:   logger,
+			},
 		},
 	}
 }
@@ -136,13 +146,13 @@ func (xb *XBot) Init() {
 	xb.babel.RegisterMessageHandler(protoID, DisconnectMessage{}, xb.HandleDisconnectMessage)
 
 	// X-BOT additions
-	xb.babel.RegisterMessageHandler(protoID, OptimizationMessage{}, xb.HandleOptimizationMessage)
-	xb.babel.RegisterMessageHandler(protoID, ReplaceMessage{}, xb.handleReplaceMsg)
-	xb.babel.RegisterMessageHandler(protoID, ReplaceMessageReply{}, xb.handleReplaceMsgReply)
-	xb.babel.RegisterMessageHandler(protoID, SwitchMessage{}, xb.handleSwitchMsg)
-	xb.babel.RegisterMessageHandler(protoID, SwitchMessageReply{}, xb.handleSwitchMsgReply)
-	xb.babel.RegisterMessageHandler(protoID, OptimizationMessageReply{}, xb.handleOptimizationMsgReply)
-	xb.babel.RegisterMessageHandler(protoID, DisconnectWaitMessage{}, xb.handleDisconnectWaitMsg)
+	xb.babel.RegisterMessageHandler(protoID, &OptimizationMessage{}, xb.HandleOptimizationMessage)
+	xb.babel.RegisterMessageHandler(protoID, &ReplaceMessage{}, xb.handleReplaceMsg)
+	xb.babel.RegisterMessageHandler(protoID, &ReplaceMessageReply{}, xb.handleReplaceMsgReply)
+	xb.babel.RegisterMessageHandler(protoID, &SwitchMessage{}, xb.handleSwitchMsg)
+	xb.babel.RegisterMessageHandler(protoID, &SwitchMessageReply{}, xb.handleSwitchMsgReply)
+	xb.babel.RegisterMessageHandler(protoID, &OptimizationMessageReply{}, xb.handleOptimizationMsgReply)
+	xb.babel.RegisterMessageHandler(protoID, &DisconnectWaitMessage{}, xb.handleDisconnectWaitMsg)
 
 	xb.babel.RegisterNotificationHandler(protoID, PeerMeasuredNotification{}, xb.handlePeerMeasuredNotification)
 }
