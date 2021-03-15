@@ -16,9 +16,10 @@ import (
 )
 
 var (
-	randomPort *bool
-	bootstraps *string
-	listenIP   *string
+	randomPort          *bool
+	randomAnalyticsPort *bool
+	bootstraps          *string
+	listenIP            *string
 )
 
 func main() {
@@ -27,6 +28,8 @@ func main() {
 	}
 
 	randomPort = flag.Bool("rport", false, "choose random port")
+	randomAnalyticsPort = flag.Bool("raport", false, "choose random analytics port")
+
 	bootstraps = flag.String("bootstraps", "", "choose custom bootstrap nodes (space-separated ip:port list)")
 	listenIP = flag.String("listenIP", "", "choose custom ip to listen to")
 
@@ -42,6 +45,16 @@ func main() {
 		}
 		conf.SelfPeer.Port = freePort
 	}
+
+	if *randomAnalyticsPort {
+		fmt.Println("Setting custom analytics port")
+		freePort, err := GetFreePort()
+		if err != nil {
+			panic(err)
+		}
+		conf.SelfPeer.AnalyticsPort = freePort
+	}
+
 	ParseBootstrapArg(bootstraps, conf)
 	if listenIP != nil && *listenIP != "" {
 		fmt.Printf("Have custom ip: %s ", *listenIP)
