@@ -160,9 +160,9 @@ func (xb *XBot) Init() {
 func (xb *XBot) Start() {
 	xb.logger.Infof("Starting with confs: %+v", xb.conf)
 	xb.babel.RegisterTimer(xb.ID(), ShuffleTimer{duration: time.Duration(xb.conf.JoinTimeSeconds) * time.Second})
-	xb.babel.RegisterPeriodicTimer(xb.ID(), PromoteTimer{duration: time.Duration(xb.conf.PromoteTimerDurationSeconds) * time.Second})
-	xb.babel.RegisterPeriodicTimer(xb.ID(), ImproveTimer{time.Duration(xb.conf.ImproveTimerDurationSeconds) * time.Second})
-	xb.babel.RegisterPeriodicTimer(xb.ID(), DebugTimer{time.Duration(xb.conf.DebugTimerDurationSeconds) * time.Second})
+	xb.babel.RegisterPeriodicTimer(xb.ID(), PromoteTimer{duration: time.Duration(xb.conf.PromoteTimerDurationSeconds) * time.Second}, false)
+	xb.babel.RegisterPeriodicTimer(xb.ID(), ImproveTimer{time.Duration(xb.conf.ImproveTimerDurationSeconds) * time.Second}, false)
+	xb.babel.RegisterPeriodicTimer(xb.ID(), DebugTimer{time.Duration(xb.conf.DebugTimerDurationSeconds) * time.Second}, false)
 	xb.joinOverlay()
 }
 
