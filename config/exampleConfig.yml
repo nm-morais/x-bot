@@ -2,7 +2,7 @@
 activeViewSize: 5
 arwl: 3
 bootstrapPeers:
-  - host: "0.0.0.0"
+  - host: "127.0.0.1"
     port: 1200
     analyticsPort: 1300
 dialTimeoutMiliseconds: 8000
@@ -18,7 +18,7 @@ passiveViewSize: 25
 pwrl: 6
 psl: 2
 self:
-  host: "0.0.0.0"
+  host: "127.0.0.1"
   port: 1200
   analyticsPort: 1300
 un: 1
