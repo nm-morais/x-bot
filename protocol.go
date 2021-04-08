@@ -167,17 +167,19 @@ func (xb *XBot) Start() {
 }
 
 func (xb *XBot) joinOverlay() {
-	xb.logXBotState()
-	if xb.selfIsBootstrap {
-		return
-	}
-	toSend := JoinMessage{}
-	xb.logger.Info("Joining overlay...")
 	if len(xb.bootstrapNodes) == 0 {
 		xb.logger.Panic("No nodes to join overlay...")
 	}
-	bootstrapNode := xb.bootstrapNodes[getRandInt(len(xb.bootstrapNodes))]
-	xb.babel.SendMessageSideStream(toSend, bootstrapNode, bootstrapNode.ToTCPAddr(), protoID, protoID)
+	xb.logXBotState()
+	for _, b := range xb.bootstrapNodes {
+		if peer.PeersEqual(b, xb.babel.SelfPeer()) {
+			continue
+		}
+		toSend := JoinMessage{}
+		xb.logger.Info("Joining overlay...")
+		xb.babel.SendMessageSideStream(toSend, b, b.ToTCPAddr(), protoID, protoID)
+		return
+	}
 }
 
 func (xb *XBot) InConnRequested(dialerProto protocol.ID, p peer.Peer) bool {

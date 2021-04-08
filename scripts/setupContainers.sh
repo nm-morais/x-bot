@@ -48,9 +48,6 @@ maxcpu=$(nproc)
 nContainers=$(wc -l $IPS_FILE)
 i=0
 
-bootstrap_peer_full_line=$(head -n 1 $IPS_FILE)
-bootstrap_peer=$(echo "$bootstrap_peer_full_line" | cut -d' ' -f 1)
-
 echo "Lauching containers..."
 while read -r ip name
 do
@@ -65,7 +62,7 @@ do
    --net $SWARM_NET \
    --ip $ip \
    --name $name \
-    $DOCKER_IMAGE $i $nContainers -bootstraps="$bootstrap_peer" -listenIP="$ip""
+    $DOCKER_IMAGE $i $nContainers -bootstraps=\"$BOOTSTRAPS\" -listenIP="$ip""
 
   echo "running command: '$cmd' on node $node"
 
