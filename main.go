@@ -20,13 +20,14 @@ var (
 	randomAnalyticsPort *bool
 	bootstraps          *string
 	listenIP            *string
+	confFilePath        *string
 )
 
 func main() {
 	for i := 0; i < len(os.Args); i++ {
 		fmt.Printf("arg %d: %s\n", i, os.Args[i])
 	}
-
+	confFilePath = flag.String("conf", "config/exampleConfig.yml", "specify conf file path")
 	randomPort = flag.Bool("rport", false, "choose random port")
 	randomAnalyticsPort = flag.Bool("raport", false, "choose random analytics port")
 
@@ -35,7 +36,7 @@ func main() {
 
 	flag.Parse()
 
-	conf := readConfFile()
+	conf := readConfFile(*confFilePath)
 
 	if *randomPort {
 		fmt.Println("Setting custom port")
@@ -114,8 +115,8 @@ func main() {
 	p.StartSync()
 }
 
-func readConfFile() *XBotConfig {
-	configFileName := "config/exampleConfig.yml"
+func readConfFile(path string) *XBotConfig {
+	configFileName := path
 	envVars := dry.EnvironMap()
 	customConfig, ok := envVars["config"]
 	if ok {

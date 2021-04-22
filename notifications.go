@@ -20,3 +20,23 @@ func NewPeerMeasuredNotification(p peer.Peer) PeerMeasuredNotification {
 func (PeerMeasuredNotification) ID() notification.ID {
 	return peerMeasuredNotificationID
 }
+
+const NeighborUpNotificationType = 10501
+
+type NeighborUpNotification struct {
+	PeerUp peer.Peer
+}
+
+func (n NeighborUpNotification) ID() notification.ID {
+	return NeighborUpNotificationType
+}
+
+const NeighborDownNotificationType = 10502
+
+type NeighborDownNotification struct {
+	PeerDown peer.Peer
+}
+
+func (n NeighborDownNotification) ID() notification.ID {
+	return NeighborDownNotificationType
+}

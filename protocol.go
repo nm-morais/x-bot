@@ -176,7 +176,7 @@ func (xb *XBot) joinOverlay() {
 			continue
 		}
 		toSend := JoinMessage{}
-		xb.logger.Info("Joining overlay...")
+		xb.logger.Infof("Joining overlay by sending message to: %s...", b.String())
 		xb.babel.SendMessageSideStream(toSend, b, b.ToTCPAddr(), protoID, protoID)
 		return
 	}
@@ -218,6 +218,7 @@ func (xb *XBot) handleNodeDown(p peer.Peer) {
 				HighPrio: xb.activeView.size() <= 1, // TODO review this
 			}, newNeighbor[0])
 		}
+		xb.babel.SendNotification(NeighborDownNotification{PeerDown: p})
 	}
 }
 
@@ -229,9 +230,11 @@ func (xb *XBot) DialSuccess(sourceProto protocol.ID, p peer.Peer) bool {
 	if found {
 		foundPeer.outConnected = true
 		xb.logger.Info("Dialed node in active view")
+		xb.babel.SendNotification(NeighborUpNotification{PeerUp: p})
 		return true
 	}
 	xb.logger.Infof("Disconnecting connection from peer %+v because it is not in active view", p)
+	xb.babel.SendNotification(NeighborDownNotification{PeerDown: p})
 	xb.babel.SendMessageAndDisconnect(DisconnectMessage{}, p, xb.ID(), xb.ID())
 	return true
 }
@@ -412,6 +415,7 @@ func (xb *XBot) HandleDisconnectMessage(sender peer.Peer, m message.Message) {
 	xb.logger.Infof("Got Disconnect message from %s", sender.String())
 	iPeer := sender
 	xb.activeView.remove(iPeer)
+	xb.babel.SendNotification(NeighborDownNotification{PeerDown: iPeer})
 	xb.addPeerToPassiveView(iPeer)
 }
 
