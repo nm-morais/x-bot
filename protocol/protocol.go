@@ -413,10 +413,7 @@ func (xb *XBot) HandleShuffleReplyMessage(sender peer.Peer, m message.Message) {
 
 func (xb *XBot) HandleDisconnectMessage(sender peer.Peer, m message.Message) {
 	xb.logger.Infof("Got Disconnect message from %s", sender.String())
-	iPeer := sender
-	xb.activeView.remove(iPeer)
-	xb.babel.SendNotification(NeighborDownNotification{PeerDown: iPeer})
-	xb.addPeerToPassiveView(iPeer)
+	xb.handleNodeDown(sender)
 }
 
 // ---------------- Protocol handlers (timers) ----------------
