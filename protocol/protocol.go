@@ -204,7 +204,14 @@ func (xb *XBot) DialFailed(p peer.Peer) {
 func (xb *XBot) handleNodeDown(p peer.Peer) {
 	defer xb.logXBotState()
 	defer xb.nodeWatcher.Unwatch(p, xb.ID())
-	if xb.activeView.remove(p) {
+	defer xb.babel.Disconnect(xb.ID(), p)
+	if removed := xb.activeView.remove(p); removed != nil {
+		if removed.outConnected {
+			xb.babel.SendNotification(NeighborDownNotification{
+				PeerDown: p,
+				View:     xb.getView(),
+			})
+		}
 		if !xb.activeView.isFull() {
 			if xb.passiveView.size() == 0 {
 				if xb.activeView.size() == 0 {
@@ -218,7 +225,6 @@ func (xb *XBot) handleNodeDown(p peer.Peer) {
 				HighPrio: xb.activeView.size() <= 1, // TODO review this
 			}, newNeighbor[0])
 		}
-		xb.babel.SendNotification(NeighborDownNotification{PeerDown: p})
 	}
 }
 
@@ -229,14 +235,28 @@ func (xb *XBot) DialSuccess(sourceProto protocol.ID, p peer.Peer) bool {
 	foundPeer, found := xb.activeView.get(p)
 	if found {
 		foundPeer.outConnected = true
+		xb.activeView.asMap[p.String()] = foundPeer
 		xb.logger.Info("Dialed node in active view")
-		xb.babel.SendNotification(NeighborUpNotification{PeerUp: p})
+		xb.babel.SendNotification(NeighborUpNotification{
+			PeerUp: p,
+			View:   xb.getView(),
+		})
 		return true
 	}
 	xb.logger.Infof("Disconnecting connection from peer %+v because it is not in active view", p)
-	xb.babel.SendNotification(NeighborDownNotification{PeerDown: p})
 	xb.babel.SendMessageAndDisconnect(DisconnectMessage{}, p, xb.ID(), xb.ID())
+	// xb.babel.SendNotification(NeighborDownNotification{PeerDown: p})
 	return true
+}
+
+func (xb *XBot) getView() map[string]peer.Peer {
+	toRet := map[string]peer.Peer{}
+	for _, p := range xb.activeView.asArr {
+		if p.outConnected {
+			toRet[p.String()] = p
+		}
+	}
+	return toRet
 }
 
 func (xb *XBot) MessageDelivered(msg message.Message, p peer.Peer) {
@@ -528,7 +548,7 @@ func (xb *XBot) mergeShuffleMsgPeersWithPassiveView(shuffleMsgPeers, peersToKick
 		if xb.passiveView.isFull() { // if passive view is not full, skip check and add directly
 			removed := false
 			for _, firstToKick := range peersToKickFirst {
-				if xb.passiveView.remove(firstToKick) {
+				if xb.passiveView.remove(firstToKick) != nil {
 					removed = true
 					break
 				}

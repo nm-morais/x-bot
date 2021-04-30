@@ -25,6 +25,7 @@ const NeighborUpNotificationType = 10501
 
 type NeighborUpNotification struct {
 	PeerUp peer.Peer
+	View   map[string]peer.Peer
 }
 
 func (n NeighborUpNotification) ID() notification.ID {
@@ -35,6 +36,7 @@ const NeighborDownNotificationType = 10502
 
 type NeighborDownNotification struct {
 	PeerDown peer.Peer
+	View     map[string]peer.Peer
 }
 
 func (n NeighborDownNotification) ID() notification.ID {

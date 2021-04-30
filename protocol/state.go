@@ -65,10 +65,9 @@ func (v *View) add(p *PeerState, dropIfFull bool) {
 	}
 }
 
-func (v *View) remove(p peer.Peer) (existed bool) {
+func (v *View) remove(p peer.Peer) *PeerState {
 	v.logger.Infof("Removing peer %+v from view", p)
-
-	_, existed = v.asMap[p.String()]
+	state, existed := v.asMap[p.String()]
 	if existed {
 		found := false
 		for idx, curr := range v.asArr {
@@ -85,7 +84,7 @@ func (v *View) remove(p peer.Peer) (existed bool) {
 	} else {
 		v.logger.Infof("Peer %+v did not exist in view", p)
 	}
-	return existed
+	return state
 }
 
 func (v *View) get(p fmt.Stringer) (*PeerState, bool) {
@@ -211,10 +210,15 @@ func (xb *XBot) dropRandomElemFromActiveView() {
 
 func (xb *XBot) dropPeerFromActiveView(p peer.Peer) {
 	removed := xb.activeView.remove(p)
-	if removed {
+	if removed != nil {
 		xb.addPeerToPassiveView(p)
-		disconnectMsg := DisconnectMessage{}
-		xb.babel.SendMessageAndDisconnect(disconnectMsg, p, xb.ID(), xb.ID())
 		xb.logXBotState()
+		disconnectMsg := DisconnectMessage{}
+		if removed.outConnected {
+			xb.babel.SendMessageAndDisconnect(disconnectMsg, removed, xb.ID(), xb.ID())
+			xb.babel.SendNotification(NeighborDownNotification{PeerDown: removed})
+		} else {
+			xb.babel.SendMessageSideStream(disconnectMsg, removed, removed.ToTCPAddr(), xb.ID(), xb.ID())
+		}
 	}
 }

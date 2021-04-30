@@ -11,6 +11,7 @@ import (
 
 	babel "github.com/nm-morais/go-babel/pkg"
 	"github.com/nm-morais/go-babel/pkg/peer"
+	"github.com/nm-morais/hyparview/protocol"
 	"github.com/ungerik/go-dry"
 	"gopkg.in/yaml.v2"
 )
@@ -111,11 +112,11 @@ func main() {
 	p.RegisterNodeWatcher(nw)
 	p.RegisterListenAddr(&net.TCPAddr{IP: protoManagerConf.Peer.IP(), Port: int(protoManagerConf.Peer.ProtosPort())})
 	p.RegisterListenAddr(&net.UDPAddr{IP: protoManagerConf.Peer.IP(), Port: int(protoManagerConf.Peer.ProtosPort())})
-	p.RegisterProtocol(NewXBotProtocol(p, nw, conf))
+	p.RegisterProtocol(protocol.NewXBotProtocol(p, nw, conf))
 	p.StartSync()
 }
 
-func readConfFile(path string) *XBotConfig {
+func readConfFile(path string) *protocol.XBotConfig {
 	configFileName := path
 	envVars := dry.EnvironMap()
 	customConfig, ok := envVars["config"]
@@ -128,7 +129,7 @@ func readConfFile(path string) *XBotConfig {
 	}
 	defer f.Close()
 
-	cfg := &XBotConfig{}
+	cfg := &protocol.XBotConfig{}
 	decoder := yaml.NewDecoder(f)
 	err = decoder.Decode(cfg)
 	if err != nil {
@@ -149,7 +150,7 @@ func GetFreePort() (port int, err error) {
 	return
 }
 
-func ParseBootstrapArg(arg *string, conf *XBotConfig) {
+func ParseBootstrapArg(arg *string, conf *protocol.XBotConfig) {
 	if arg != nil && *arg != "" {
 		bootstrapPeers := []struct {
 			Port          int    `yaml:"port"`
