@@ -143,14 +143,14 @@ type XBotState struct {
 	passiveView                   *View
 }
 
-func (xb *XBot) addPeerToActiveView(newPeer peer.Peer) {
+func (xb *XBot) addPeerToActiveView(newPeer peer.Peer) bool {
 	if peer.PeersEqual(xb.babel.SelfPeer(), newPeer) {
 		xb.logger.Panic("Trying to add self to active view")
 	}
 
 	if xb.activeView.contains(newPeer) {
 		xb.logger.Warnf("trying to add node %s already in active view", newPeer.String())
-		return
+		return false
 	}
 
 	if xb.activeView.isFull() {
@@ -172,6 +172,7 @@ func (xb *XBot) addPeerToActiveView(newPeer peer.Peer) {
 	xb.pendingActiveViewMeasurements[newPeer.String()] = true
 	xb.measureNode(newPeer)
 	xb.logXBotState()
+	return true
 }
 
 func (xb *XBot) addPeerToPassiveView(newPeer peer.Peer) {
@@ -216,7 +217,10 @@ func (xb *XBot) dropPeerFromActiveView(p peer.Peer) {
 		disconnectMsg := DisconnectMessage{}
 		if removed.outConnected {
 			xb.babel.SendMessageAndDisconnect(disconnectMsg, removed, xb.ID(), xb.ID())
-			xb.babel.SendNotification(NeighborDownNotification{PeerDown: removed})
+			xb.babel.SendNotification(NeighborDownNotification{
+				PeerDown: removed,
+				View:     xb.getView(),
+			})
 		} else {
 			xb.babel.SendMessageSideStream(disconnectMsg, removed, removed.ToTCPAddr(), xb.ID(), xb.ID())
 		}

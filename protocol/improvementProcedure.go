@@ -182,6 +182,7 @@ func (xb *XBot) handleSwitchMsg(sender peer.Peer, m message.Message) {
 	_, tombstone := xb.disconnectWaits[initiator.String()]
 	accepted := false
 	if xb.activeView.contains(initiator) || tombstone {
+
 		xb.babel.SendMessageAndDisconnect(&DisconnectWaitMessage{}, initiator, xb.ID(), xb.ID())
 		delete(xb.disconnectWaits, initiator.String())
 		xb.addPeerToActiveView(sender)
@@ -203,8 +204,15 @@ func (xb *XBot) handleSwitchMsgReply(sender peer.Peer, m message.Message) {
 			Initiator: switchMsgReply.Initiator,
 			O:         sender,
 		}, switchMsgReply.Candidate, xb.ID(), xb.ID())
-		xb.activeView.remove(switchMsgReply.Candidate)
-		xb.nodeWatcher.Unwatch(sender, xb.ID())
+		if p := xb.activeView.remove(switchMsgReply.Candidate); p != nil {
+			if p.outConnected {
+				xb.babel.SendNotification(NeighborDownNotification{
+					PeerDown: p,
+					View:     xb.getView(),
+				})
+			}
+			xb.nodeWatcher.Unwatch(sender, xb.ID())
+		}
 		xb.addPeerToActiveView(sender)
 		return
 	}
@@ -220,10 +228,16 @@ func (xb *XBot) handleOptimizationMsgReply(sender peer.Peer, m message.Message) 
 	xb.logger.Infof("Got OptimizationMessageReply %+v from %s", optMsgReply, sender)
 	if optMsgReply.accepted {
 		if optMsgReply.hasOtherNode {
-			if xb.activeView.contains(optMsgReply.O) {
+			if p := xb.activeView.remove(optMsgReply.O); p != nil {
 				xb.logger.Infof("Switching peer %s for %s", optMsgReply.O.String(), sender)
-				xb.babel.SendMessageAndDisconnect(&DisconnectWaitMessage{}, optMsgReply.O, xb.ID(), xb.ID())
-				xb.activeView.remove(optMsgReply.O)
+				if p.outConnected {
+					xb.babel.SendNotification(NeighborDownNotification{
+						PeerDown: p,
+						View:     xb.getView(),
+					})
+					xb.babel.SendMessageAndDisconnect(&DisconnectWaitMessage{}, optMsgReply.O, xb.ID(), xb.ID())
+				}
+				xb.babel.SendMessageSideStream(DisconnectMessage{}, optMsgReply.O, optMsgReply.O.ToTCPAddr(), xb.ID(), xb.ID())
 				xb.nodeWatcher.Unwatch(sender, xb.ID())
 			}
 		}

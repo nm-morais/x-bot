@@ -289,16 +289,17 @@ func (xb *XBot) HandleJoinMessage(sender peer.Peer, msg message.Message) {
 		TTL:            uint32(xb.conf.ARWL),
 		OriginalSender: sender,
 	}
-	xb.addPeerToActiveView(sender)
-	xb.sendMessageTmpTransport(ForwardJoinMessageReply{}, sender)
-	for _, neigh := range xb.activeView.asArr {
-		if peer.PeersEqual(neigh, sender) {
-			continue
-		}
+	if xb.addPeerToActiveView(sender) {
+		xb.sendMessageTmpTransport(ForwardJoinMessageReply{}, sender)
+		for _, neigh := range xb.activeView.asArr {
+			if peer.PeersEqual(neigh, sender) {
+				continue
+			}
 
-		if neigh.outConnected {
-			xb.logger.Infof("Sending ForwardJoin (original=%s) message to: %s", sender.String(), neigh.String())
-			xb.sendMessage(toSend, neigh)
+			if neigh.outConnected {
+				xb.logger.Infof("Sending ForwardJoin (original=%s) message to: %s", sender.String(), neigh.String())
+				xb.sendMessage(toSend, neigh)
+			}
 		}
 	}
 }
@@ -321,8 +322,9 @@ func (xb *XBot) HandleForwardJoinMessage(sender peer.Peer, msg message.Message) 
 		if xb.activeView.size() == 1 {
 			xb.logger.Infof("Accepting forwardJoin message from %s, xb.activeView.size() == 1", fwdJoinMsg.OriginalSender.String())
 		}
-		xb.addPeerToActiveView(fwdJoinMsg.OriginalSender)
-		xb.sendMessageTmpTransport(ForwardJoinMessageReply{}, fwdJoinMsg.OriginalSender)
+		if xb.addPeerToActiveView(fwdJoinMsg.OriginalSender) {
+			xb.sendMessageTmpTransport(ForwardJoinMessageReply{}, fwdJoinMsg.OriginalSender)
+		}
 		return
 	}
 
@@ -333,8 +335,9 @@ func (xb *XBot) HandleForwardJoinMessage(sender peer.Peer, msg message.Message) 
 	rndSample := xb.activeView.getRandomElementsFromView(1, fwdJoinMsg.OriginalSender, sender)
 	if len(rndSample) == 0 { // only know original sender, act as if join message
 		xb.logger.Errorf("Cannot forward forwardJoin message, dialing %s", fwdJoinMsg.OriginalSender.String())
-		xb.addPeerToActiveView(fwdJoinMsg.OriginalSender)
-		xb.sendMessageTmpTransport(ForwardJoinMessageReply{}, fwdJoinMsg.OriginalSender)
+		if xb.addPeerToActiveView(fwdJoinMsg.OriginalSender) {
+			xb.sendMessageTmpTransport(ForwardJoinMessageReply{}, fwdJoinMsg.OriginalSender)
+		}
 		return
 	}
 
@@ -445,7 +448,7 @@ func (xb *XBot) HandlePromoteTimer(t timer.Timer) {
 			xb.joinOverlay()
 			return
 		}
-		if !xb.activeView.isFull() && xb.passiveView.size() > 0 {
+		if !xb.activeView.isFull() && xb.passiveView.size() > 0 && xb.activeView.size()+len(xb.disconnectWaits) < xb.activeView.capacity {
 			xb.logger.Info("Promoting node from passive view to active view")
 			newNeighbor := xb.passiveView.getRandomElementsFromView(1)
 			xb.sendMessageTmpTransport(NeighbourMessage{
