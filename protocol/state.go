@@ -2,7 +2,6 @@ package protocol
 
 import (
 	"fmt"
-	"math"
 	"math/rand"
 
 	"github.com/nm-morais/go-babel/pkg/peer"
@@ -166,7 +165,7 @@ func (xb *XBot) addPeerToActiveView(newPeer peer.Peer) bool {
 	xb.activeView.add(&PeerState{
 		Peer:          newPeer,
 		outConnected:  false,
-		measuredScore: math.MaxInt64,
+		measuredScore: 0,
 	}, false)
 	xb.babel.Dial(xb.ID(), newPeer, newPeer.ToTCPAddr())
 	xb.pendingActiveViewMeasurements[newPeer.String()] = true

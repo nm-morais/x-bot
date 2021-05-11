@@ -164,9 +164,16 @@ func (xb *XBot) Start() {
 	xb.babel.RegisterPeriodicTimer(xb.ID(), ImproveTimer{time.Duration(xb.conf.ImproveTimerDurationSeconds) * time.Second}, false)
 	xb.babel.RegisterPeriodicTimer(xb.ID(), DebugTimer{time.Duration(xb.conf.DebugTimerDurationSeconds) * time.Second}, false)
 	xb.joinOverlay()
+	xb.timeStart = time.Now()
 }
 
 func (xb *XBot) joinOverlay() {
+
+	if time.Since(xb.timeStart) < time.Duration(xb.conf.JoinTimeSeconds)*time.Second {
+		xb.logger.Infof("Not rejoining since not enough time has passed: %+v", xb.conf.JoinTimeSeconds)
+		return
+	}
+
 	if len(xb.bootstrapNodes) == 0 {
 		xb.logger.Panic("No nodes to join overlay...")
 	}
@@ -244,8 +251,9 @@ func (xb *XBot) DialSuccess(sourceProto protocol.ID, p peer.Peer) bool {
 		return true
 	}
 	xb.logger.Infof("Disconnecting connection from peer %+v because it is not in active view", p)
-	xb.babel.SendMessageAndDisconnect(DisconnectMessage{}, p, xb.ID(), xb.ID())
+	// xb.babel.SendMessageAndDisconnect(DisconnectMessage{}, p, xb.ID(), xb.ID())
 	// xb.babel.SendNotification(NeighborDownNotification{PeerDown: p})
+	xb.babel.Disconnect(xb.ID(), p)
 	return true
 }
 

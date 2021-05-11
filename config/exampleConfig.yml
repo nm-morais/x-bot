@@ -13,7 +13,7 @@ logFolder: /tmp/logs/
 minShuffleTimerDurationSeconds: 7
 improveTimerDurationSeconds: 15
 promoteTimerDurationSeconds: 10
-minImprovementMilliseconds: 25
+minImprovementMilliseconds: 50
 passiveViewSize: 25
 pwrl: 6
 psl: 2

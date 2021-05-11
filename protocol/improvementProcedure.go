@@ -33,6 +33,7 @@ func (xb *XBot) handlePeerMeasuredNotification(n notification.Notification) {
 	peerMeasuredNotification := n.(PeerMeasuredNotification)
 	peerMeasured := peerMeasuredNotification.peerMeasured
 	peerMeasuredNInfo, err := xb.nodeWatcher.GetNodeInfo(peerMeasured)
+	isInView := false
 	if err != nil {
 		xb.logger.Warnf("peer was %s not being measured", peerMeasured.String())
 		return
@@ -46,33 +47,36 @@ func (xb *XBot) handlePeerMeasuredNotification(n notification.Notification) {
 			activeViewPeer.measuredScore = measuredScore
 		}
 		delete(xb.pendingActiveViewMeasurements, peerMeasured.String())
-		return
+		isInView = true
 	}
-
-	defer xb.nodeWatcher.Unwatch(peerMeasured, xb.ID())
+	if !isInView {
+		defer xb.nodeWatcher.Unwatch(peerMeasured, xb.ID())
+	}
 	// measurements for pending optimizations
 	_, ok := xb.pendingOptimizations[peerMeasured.String()]
 	if ok {
 		delete(xb.pendingOptimizations, peerMeasured.String())
-		xb.logger.Infof("Measured peer %s is a pending optimization ", peerMeasured.String())
-		if xb.activeView.isFull() {
-			toCompareWith := xb.activeView.asArr[xb.conf.UN:]
-			sort.Sort(toCompareWith)
-			for _, curr := range toCompareWith {
-				if xb.isBetter(measuredScore, curr.measuredScore) {
-					// latency to curr is better
-					xb.logger.Infof("Measured peer %s:%+v is better than peer %s:%+v!",
+		if !isInView {
+			xb.logger.Infof("Measured peer %s is a pending optimization ", peerMeasured.String())
+			if xb.activeView.isFull() {
+				toCompareWith := xb.activeView.asArr[xb.conf.UN:]
+				sort.Sort(toCompareWith)
+				for _, curr := range toCompareWith {
+					if xb.isBetter(measuredScore, curr.measuredScore) {
+						// latency to curr is better
+						xb.logger.Infof("Measured peer %s:%+v is better than peer %s:%+v!",
+							peerMeasured.String(), measuredScore, curr.String(), curr.measuredScore)
+						xb.sendMessageTmpTransport(&OptimizationMessage{
+							O: curr,
+						}, peerMeasured)
+						return
+					}
+					xb.logger.Infof("Measured peer %s:%+v is not better than peer %s:%+v",
 						peerMeasured.String(), measuredScore, curr.String(), curr.measuredScore)
-					xb.sendMessageTmpTransport(&OptimizationMessage{
-						O: curr,
-					}, peerMeasured)
-					return
 				}
-				xb.logger.Infof("Measured peer %s:%+v is not better than peer %s:%+v",
-					peerMeasured.String(), measuredScore, curr.String(), curr.measuredScore)
+			} else {
+				xb.logger.Warn("Discarding measurement because active view is not full")
 			}
-		} else {
-			xb.logger.Warn("Discarding measurement because active view is not full")
 		}
 	}
 
@@ -82,7 +86,7 @@ func (xb *XBot) handlePeerMeasuredNotification(n notification.Notification) {
 		delete(xb.pendingReplacements, peerMeasured.String())
 		xb.logger.Infof("Measured peer %s is a pending replacement ", peerMeasured.String())
 		candidate, ok := xb.activeView.get(replacement.candidate)
-		if !ok {
+		if !ok || !candidate.outConnected {
 			xb.logger.Warnf("candidate peer is not in active view anymore, refusing ReplaceMessage")
 			xb.sendMessageTmpTransport(&ReplaceMessageReply{
 				answer:    false,
@@ -94,14 +98,13 @@ func (xb *XBot) handlePeerMeasuredNotification(n notification.Notification) {
 
 		if !xb.isBetter(measuredScore, candidate.measuredScore) {
 			xb.logger.Warnf("candidate peer is not better, refusing ReplaceMessage")
-			xb.sendMessage(&ReplaceMessageReply{
+			xb.sendMessageTmpTransport(&ReplaceMessageReply{
 				answer:    false,
 				Initiator: replacement.initiator,
 				O:         replacement.original,
 			}, replacement.candidate)
 			return
 		}
-
 		// is better!
 		xb.sendMessageTmpTransport(&SwitchMessage{
 			I: replacement.initiator,
@@ -114,7 +117,7 @@ func (xb *XBot) HandleOptimizationMessage(sender peer.Peer, m message.Message) {
 	optMsg := m.(*OptimizationMessage)
 	xb.logger.Infof("Got Optimization message %+v", optMsg)
 
-	if !xb.activeView.isFull() {
+	if !xb.activeView.isFull() && len(xb.disconnectWaits)+len(xb.activeView.asArr) < xb.activeView.capacity {
 		xb.addPeerToActiveView(sender)
 		xb.sendMessageTmpTransport(&OptimizationMessageReply{
 			accepted:     true,
@@ -131,8 +134,7 @@ func (xb *XBot) HandleOptimizationMessage(sender peer.Peer, m message.Message) {
 		if peer.PeersEqual(toDrop, optMsg.O) {
 			continue
 		}
-
-		xb.sendMessageTmpTransport(&ReplaceMessage{
+		xb.sendMessage(&ReplaceMessage{
 			Initiator: sender,
 			O:         optMsg.O,
 		}, toDrop)
@@ -143,6 +145,24 @@ func (xb *XBot) HandleOptimizationMessage(sender peer.Peer, m message.Message) {
 func (xb *XBot) handleReplaceMsg(sender peer.Peer, m message.Message) {
 	replaceMsg := m.(*ReplaceMessage)
 	xb.logger.Infof("Got Replace message %+v from %s", replaceMsg, sender)
+	if _, ok := xb.pendingActiveViewMeasurements[replaceMsg.O.String()]; ok {
+		xb.sendMessage(&ReplaceMessageReply{
+			answer:    false,
+			Initiator: replaceMsg.Initiator,
+			O:         replaceMsg.O,
+		}, sender)
+		return
+	}
+
+	if !xb.activeView.contains(sender) {
+		xb.sendMessage(&ReplaceMessageReply{
+			answer:    false,
+			Initiator: replaceMsg.Initiator,
+			O:         replaceMsg.O,
+		}, sender)
+		return
+	}
+
 	xb.pendingReplacements[replaceMsg.O.String()] = pendingReplacement{
 		initiator: replaceMsg.Initiator,
 		original:  replaceMsg.O,
@@ -156,7 +176,14 @@ func (xb *XBot) handleReplaceMsgReply(sender peer.Peer, m message.Message) {
 	replaceMsgReply := m.(*ReplaceMessageReply)
 	xb.logger.Infof("Got Replace reply %+v from %s", replaceMsgReply, sender)
 	if replaceMsgReply.answer {
-		xb.activeView.remove(sender) // this is D
+		p := xb.activeView.remove(sender) // this is D
+		if p != nil && p.outConnected {
+			xb.babel.SendNotification(NeighborDownNotification{
+				PeerDown: p,
+				View:     xb.getView(),
+			})
+			xb.babel.Disconnect(xb.ID(), p)
+		}
 		xb.nodeWatcher.Unwatch(sender, xb.ID())
 		xb.addPeerToActiveView(replaceMsgReply.Initiator)
 		xb.babel.SendMessageSideStream(&OptimizationMessageReply{
@@ -181,9 +208,20 @@ func (xb *XBot) handleSwitchMsg(sender peer.Peer, m message.Message) {
 	initiator := switchMsg.I
 	_, tombstone := xb.disconnectWaits[initiator.String()]
 	accepted := false
-	if xb.activeView.contains(initiator) || tombstone {
-
-		xb.babel.SendMessageAndDisconnect(&DisconnectWaitMessage{}, initiator, xb.ID(), xb.ID())
+	p, ok := xb.activeView.get(initiator)
+	if ok || tombstone {
+		if ok {
+			if p.outConnected {
+				xb.babel.SendNotification(NeighborDownNotification{
+					PeerDown: p,
+					View:     xb.getView(),
+				})
+				xb.babel.SendMessageAndDisconnect(&DisconnectWaitMessage{}, initiator, xb.ID(), xb.ID())
+			} else {
+				xb.babel.SendMessageSideStream(&DisconnectWaitMessage{}, initiator, initiator.ToTCPAddr(), xb.ID(), xb.ID())
+			}
+			xb.activeView.remove(initiator)
+		}
 		delete(xb.disconnectWaits, initiator.String())
 		xb.addPeerToActiveView(sender)
 		accepted = true
@@ -199,28 +237,34 @@ func (xb *XBot) handleSwitchMsgReply(sender peer.Peer, m message.Message) {
 	switchMsgReply := m.(*SwitchMessageReply)
 	xb.logger.Infof("Got switchMsgReply message %+v from %s", switchMsgReply, sender)
 	if switchMsgReply.answer {
-		xb.babel.SendMessageAndDisconnect(&ReplaceMessageReply{
-			answer:    switchMsgReply.answer,
-			Initiator: switchMsgReply.Initiator,
-			O:         sender,
-		}, switchMsgReply.Candidate, xb.ID(), xb.ID())
 		if p := xb.activeView.remove(switchMsgReply.Candidate); p != nil {
 			if p.outConnected {
+				xb.babel.SendMessageAndDisconnect(&ReplaceMessageReply{
+					answer:    switchMsgReply.answer,
+					Initiator: switchMsgReply.Initiator,
+					O:         sender,
+				}, switchMsgReply.Candidate, xb.ID(), xb.ID())
 				xb.babel.SendNotification(NeighborDownNotification{
 					PeerDown: p,
 					View:     xb.getView(),
 				})
+			} else {
+				xb.babel.SendMessageSideStream(&ReplaceMessageReply{
+					answer:    switchMsgReply.answer,
+					Initiator: switchMsgReply.Initiator,
+					O:         sender,
+				}, switchMsgReply.Candidate, switchMsgReply.Candidate.ToTCPAddr(), xb.ID(), xb.ID())
 			}
 			xb.nodeWatcher.Unwatch(sender, xb.ID())
 		}
 		xb.addPeerToActiveView(sender)
-		return
+	} else {
+		xb.sendMessage(&ReplaceMessageReply{
+			answer:    switchMsgReply.answer,
+			Initiator: switchMsgReply.Initiator,
+			O:         sender,
+		}, switchMsgReply.Candidate)
 	}
-	xb.sendMessage(&ReplaceMessageReply{
-		answer:    switchMsgReply.answer,
-		Initiator: switchMsgReply.Initiator,
-		O:         sender,
-	}, switchMsgReply.Candidate)
 }
 
 func (xb *XBot) handleOptimizationMsgReply(sender peer.Peer, m message.Message) {
@@ -236,10 +280,11 @@ func (xb *XBot) handleOptimizationMsgReply(sender peer.Peer, m message.Message) 
 						View:     xb.getView(),
 					})
 					xb.babel.SendMessageAndDisconnect(&DisconnectWaitMessage{}, optMsgReply.O, xb.ID(), xb.ID())
+				} else {
+					xb.babel.SendMessageSideStream(DisconnectMessage{}, optMsgReply.O, optMsgReply.O.ToTCPAddr(), xb.ID(), xb.ID())
 				}
-				xb.babel.SendMessageSideStream(DisconnectMessage{}, optMsgReply.O, optMsgReply.O.ToTCPAddr(), xb.ID(), xb.ID())
-				xb.nodeWatcher.Unwatch(sender, xb.ID())
 			}
+			xb.nodeWatcher.Unwatch(sender, xb.ID())
 		}
 		xb.passiveView.remove(sender)
 		xb.addPeerToActiveView(sender)
