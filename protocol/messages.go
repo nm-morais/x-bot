@@ -158,7 +158,30 @@ func (neighbourMessageReplySerializer) Deserialize(msgBytes []byte) message.Mess
 	}
 }
 
-const ShuffleMessageType = 2006
+const NeighbourMaintenanceMessageType = 2006
+
+type NeighbourMaintenanceMessage struct {
+}
+type neighbourMaintenanceMessageSerializer struct{}
+
+var defaultNeighbourMaintenanceMessageSerializer = neighbourMaintenanceMessageSerializer{}
+
+func (NeighbourMaintenanceMessage) Type() message.ID { return NeighbourMaintenanceMessageType }
+func (NeighbourMaintenanceMessage) Serializer() message.Serializer {
+	return defaultNeighbourMaintenanceMessageSerializer
+}
+func (NeighbourMaintenanceMessage) Deserializer() message.Deserializer {
+	return defaultNeighbourMaintenanceMessageSerializer
+}
+func (neighbourMaintenanceMessageSerializer) Serialize(msg message.Message) []byte {
+	return []byte{}
+}
+
+func (neighbourMaintenanceMessageSerializer) Deserialize(msgBytes []byte) message.Message {
+	return NeighbourMaintenanceMessage{}
+}
+
+const ShuffleMessageType = 2007
 
 type ShuffleMessage struct {
 	ID    uint32
@@ -195,7 +218,7 @@ func (ShuffleMessageSerializer) Deserialize(msgBytes []byte) message.Message {
 	}
 }
 
-const ShuffleReplyMessageType = 2007
+const ShuffleReplyMessageType = 2008
 
 type ShuffleReplyMessage struct {
 	ID    uint32
@@ -228,7 +251,7 @@ func (ShuffleReplyMessageSerializer) Deserialize(msgBytes []byte) message.Messag
 	}
 }
 
-const OptimizationMessageType = 2008
+const OptimizationMessageType = 2009
 
 type OptimizationMessage struct {
 	O peer.Peer
@@ -258,7 +281,7 @@ func (OptimizationMessageSerializer) Deserialize(msgBytes []byte) message.Messag
 	}
 }
 
-const OptimizationMessageReplyType = 2009
+const OptimizationMessageReplyType = 2010
 
 type OptimizationMessageReply struct {
 	accepted     bool
@@ -320,7 +343,7 @@ func (OptimizationMessageReplySerializer) Deserialize(msgBytes []byte) message.M
 	}
 }
 
-const ReplaceMessageType = 2010
+const ReplaceMessageType = 2011
 
 type ReplaceMessage struct {
 	Initiator peer.Peer
@@ -356,7 +379,7 @@ func (ReplaceMessageSerializer) Deserialize(msgBytes []byte) message.Message {
 	}
 }
 
-const ReplaceMessageReplyType = 2011
+const ReplaceMessageReplyType = 2012
 
 type ReplaceMessageReply struct {
 	answer    bool
@@ -403,7 +426,7 @@ func (ReplaceMessageReplySerializer) Deserialize(msgBytes []byte) message.Messag
 	}
 }
 
-const SwitchMessageType = 2012
+const SwitchMessageType = 2013
 
 type SwitchMessage struct {
 	I peer.Peer
@@ -442,7 +465,7 @@ func (SwitchMessageSerializer) Deserialize(msgBytes []byte) message.Message {
 	}
 }
 
-const SwitchMessageReplyType = 2013
+const SwitchMessageReplyType = 2014
 
 type SwitchMessageReply struct {
 	answer    bool
@@ -489,7 +512,7 @@ func (SwitchMessageReplySerializer) Deserialize(msgBytes []byte) message.Message
 	}
 }
 
-const DisconnectWaitType = 2014
+const DisconnectWaitType = 2015
 
 type DisconnectWaitMessage struct{}
 type DisconnectWaitSerializer struct{}

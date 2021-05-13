@@ -49,7 +49,21 @@ func (s ImproveTimer) Duration() time.Duration {
 	return s.duration
 }
 
-const DisconnectWaitTimeoutTimerID = 2004
+const MaintenanceTimerID = 2004
+
+type MaintenanceTimer struct {
+	duration time.Duration
+}
+
+func (MaintenanceTimer) ID() timer.ID {
+	return MaintenanceTimerID
+}
+
+func (s MaintenanceTimer) Duration() time.Duration {
+	return s.duration
+}
+
+const DisconnectWaitTimeoutTimerID = 2005
 
 type DisconnectWaitTimeoutTimer struct {
 	duration time.Duration
@@ -64,7 +78,7 @@ func (s DisconnectWaitTimeoutTimer) Duration() time.Duration {
 	return s.duration
 }
 
-const DebugTimerID = 2005
+const DebugTimerID = 2006
 
 type DebugTimer struct {
 	duration time.Duration
