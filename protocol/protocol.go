@@ -55,14 +55,15 @@ type XBotConfig struct {
 	UN                              int    `yaml:"un"`
 }
 type XBot struct {
-	babel           protocolManager.ProtocolManager
-	nodeWatcher     nodeWatcher.NodeWatcher
-	lastShuffleMsg  *ShuffleMessage
-	timeStart       time.Time
-	logger          *logrus.Logger
-	conf            *XBotConfig
-	selfIsBootstrap bool
-	bootstrapNodes  []peer.Peer
+	babel                 protocolManager.ProtocolManager
+	nodeWatcher           nodeWatcher.NodeWatcher
+	lastShuffleMsg        *ShuffleMessage
+	timeStart             time.Time
+	logger                *logrus.Logger
+	conf                  *XBotConfig
+	selfIsBootstrap       bool
+	danglingNeighCounters map[string]int
+	bootstrapNodes        []peer.Peer
 	*XBotState
 }
 
@@ -90,8 +91,9 @@ func NewXBotProtocol(babel protocolManager.ProtocolManager, nw nodeWatcher.NodeW
 		logger:         logger,
 		conf:           conf,
 
-		bootstrapNodes:  bootstrapNodes,
-		selfIsBootstrap: selfIsBootstrap,
+		bootstrapNodes:        bootstrapNodes,
+		selfIsBootstrap:       selfIsBootstrap,
+		danglingNeighCounters: make(map[string]int),
 
 		XBotState: &XBotState{
 			disconnectWaits:               map[string]bool{},
@@ -135,6 +137,7 @@ func (xb *XBot) Init() {
 	// X-BOT addition
 	xb.babel.RegisterTimerHandler(protoID, DisconnectWaitTimeoutTimerID, xb.handleDisconnectWaitTimeoutTimer)
 	xb.babel.RegisterTimerHandler(protoID, ImproveTimerID, xb.HandleImproveTimer)
+	xb.babel.RegisterTimerHandler(protoID, MaintenanceTimerID, xb.HandleMaintenanceTimer)
 
 	xb.babel.RegisterMessageHandler(protoID, JoinMessage{}, xb.HandleJoinMessage)
 	xb.babel.RegisterMessageHandler(protoID, ForwardJoinMessage{}, xb.HandleForwardJoinMessage)
@@ -148,6 +151,7 @@ func (xb *XBot) Init() {
 	// X-BOT additions
 	xb.babel.RegisterMessageHandler(protoID, &OptimizationMessage{}, xb.HandleOptimizationMessage)
 	xb.babel.RegisterMessageHandler(protoID, &ReplaceMessage{}, xb.handleReplaceMsg)
+	xb.babel.RegisterMessageHandler(protoID, &NeighbourMaintenanceMessage{}, xb.HandleNeighbourMaintenanceMessage)
 	xb.babel.RegisterMessageHandler(protoID, &ReplaceMessageReply{}, xb.handleReplaceMsgReply)
 	xb.babel.RegisterMessageHandler(protoID, &SwitchMessage{}, xb.handleSwitchMsg)
 	xb.babel.RegisterMessageHandler(protoID, &SwitchMessageReply{}, xb.handleSwitchMsgReply)
@@ -163,6 +167,7 @@ func (xb *XBot) Start() {
 	xb.babel.RegisterPeriodicTimer(xb.ID(), PromoteTimer{duration: time.Duration(xb.conf.PromoteTimerDurationSeconds) * time.Second}, false)
 	xb.babel.RegisterPeriodicTimer(xb.ID(), ImproveTimer{time.Duration(xb.conf.ImproveTimerDurationSeconds) * time.Second}, false)
 	xb.babel.RegisterPeriodicTimer(xb.ID(), DebugTimer{time.Duration(xb.conf.DebugTimerDurationSeconds) * time.Second}, false)
+	xb.babel.RegisterPeriodicTimer(xb.ID(), MaintenanceTimer{1 * time.Second}, false)
 	xb.joinOverlay()
 	xb.timeStart = time.Now()
 }
@@ -445,6 +450,32 @@ func (xb *XBot) HandleShuffleReplyMessage(sender peer.Peer, m message.Message) {
 func (xb *XBot) HandleDisconnectMessage(sender peer.Peer, m message.Message) {
 	xb.logger.Infof("Got Disconnect message from %s", sender.String())
 	xb.handleNodeDown(sender)
+}
+
+func (xb *XBot) HandleMaintenanceTimer(t timer.Timer) {
+	for _, p := range xb.activeView.asArr {
+		if !p.outConnected {
+			xb.babel.Dial(xb.ID(), p, p.ToTCPAddr())
+		}
+		xb.sendMessage(NeighbourMaintenanceMessage{}, p)
+	}
+}
+
+func (xb *XBot) HandleNeighbourMaintenanceMessage(sender peer.Peer, msg message.Message) {
+	if xb.activeView.contains(sender) {
+		delete(xb.danglingNeighCounters, sender.String())
+		return
+	}
+	xb.logger.Warn("Got maintenance message from not a neigh")
+	_, ok := xb.danglingNeighCounters[sender.String()]
+	if !ok {
+		xb.danglingNeighCounters[sender.String()] = 0
+	}
+	xb.danglingNeighCounters[sender.String()]++
+	if xb.danglingNeighCounters[sender.String()] >= 3 {
+		xb.babel.SendMessageSideStream(DisconnectMessage{}, sender, sender.ToTCPAddr(), xb.ID(), xb.ID())
+		xb.logger.Warn("Disconnecting due to maintenance msg")
+	}
 }
 
 // ---------------- Protocol handlers (timers) ----------------
