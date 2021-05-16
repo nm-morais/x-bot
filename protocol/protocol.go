@@ -462,9 +462,14 @@ func (xb *XBot) HandleMaintenanceTimer(t timer.Timer) {
 }
 
 func (xb *XBot) HandleNeighbourMaintenanceMessage(sender peer.Peer, msg message.Message) {
-	if xb.activeView.contains(sender) {
-		delete(xb.danglingNeighCounters, sender.String())
-		return
+	if p, ok := xb.activeView.get(sender); ok {
+		if p.outConnected {
+			delete(xb.danglingNeighCounters, sender.String())
+			return
+		} else {
+			xb.babel.Dial(xb.ID(), sender, sender.ToTCPAddr())
+			return
+		}
 	}
 	xb.logger.Warn("Got maintenance message from not a neigh")
 	_, ok := xb.danglingNeighCounters[sender.String()]
