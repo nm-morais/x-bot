@@ -21,7 +21,7 @@ func (s ShuffleTimer) Duration() time.Duration {
 	return s.duration
 }
 
-const PromoteTimerID = 2002
+const PromoteTimerID = 1602
 
 type PromoteTimer struct {
 	duration time.Duration
